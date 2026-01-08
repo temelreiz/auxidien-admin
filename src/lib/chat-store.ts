@@ -3,10 +3,20 @@
 
 import { Redis } from '@upstash/redis';
 
-const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_REST_URL!,
-  token: process.env.UPSTASH_REDIS_REST_TOKEN!,
-});
+let redis: Redis | null = null;
+
+function getRedis(): Redis {
+  if (!redis) {
+    if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) {
+      throw new Error('Redis environment variables not configured');
+    }
+    redis = new Redis({
+      url: process.env.UPSTASH_REDIS_REST_URL,
+      token: process.env.UPSTASH_REDIS_REST_TOKEN,
+    });
+  }
+  return redis;
+}
 
 export interface ChatMessage {
   id: string;
@@ -51,18 +61,18 @@ export async function createSession(sessionId: string, userAgent?: string, ip?: 
     status: 'active',
   };
   
-  await redis.hset(`chat:${sessionId}`, {
+  await getRedis().hset(`chat:${sessionId}`, {
     ...session,
     messages: JSON.stringify([]),
   });
-  await redis.zadd('chat:sessions', { score: Date.now(), member: sessionId });
-  await redis.incr('chat:stats:totalSessions');
+  await getRedis().zadd('chat:sessions', { score: Date.now(), member: sessionId });
+  await getRedis().incr('chat:stats:totalSessions');
   
   return session;
 }
 
 export async function getSession(sessionId: string): Promise<ChatSession | null> {
-  const session = await redis.hgetall(`chat:${sessionId}`) as Record<string, any>;
+  const session = await getRedis().hgetall(`chat:${sessionId}`) as Record<string, any>;
   if (!session || Object.keys(session).length === 0) return null;
   
   return {
@@ -80,20 +90,20 @@ export async function addMessage(sessionId: string, message: ChatMessage): Promi
   const messages = session?.messages || [];
   messages.push(message);
   
-  await redis.hset(`chat:${sessionId}`, {
+  await getRedis().hset(`chat:${sessionId}`, {
     messages: JSON.stringify(messages),
     updatedAt: new Date().toISOString(),
   });
   
   // Update session score for sorting
-  await redis.zadd('chat:sessions', { score: Date.now(), member: sessionId });
+  await getRedis().zadd('chat:sessions', { score: Date.now(), member: sessionId });
   
-  await redis.incr('chat:stats:totalMessages');
+  await getRedis().incr('chat:stats:totalMessages');
   
   // Track question for analytics
   if (message.role === 'user') {
     const questionKey = message.content.toLowerCase().slice(0, 100);
-    await redis.zincrby('chat:questions', 1, questionKey);
+    await getRedis().zincrby('chat:questions', 1, questionKey);
   }
 }
 
@@ -117,7 +127,7 @@ export async function overrideResponse(
     return msg;
   });
   
-  await redis.hset(`chat:${sessionId}`, {
+  await getRedis().hset(`chat:${sessionId}`, {
     messages: JSON.stringify(messages),
     updatedAt: new Date().toISOString(),
   });
@@ -135,12 +145,12 @@ export async function updateSessionStatus(
   if (notes !== undefined) {
     updates.notes = notes;
   }
-  await redis.hset(`chat:${sessionId}`, updates);
+  await getRedis().hset(`chat:${sessionId}`, updates);
 }
 
 export async function flagSession(sessionId: string, reason: string): Promise<void> {
   await updateSessionStatus(sessionId, 'flagged', reason);
-  await redis.incr('chat:stats:flaggedCount');
+  await getRedis().incr('chat:stats:flaggedCount');
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -152,7 +162,7 @@ export async function listSessions(
   offset: number = 0,
   status?: ChatSession['status']
 ): Promise<ChatSession[]> {
-  const sessionIds = await redis.zrange('chat:sessions', offset, offset + limit - 1, { rev: true });
+  const sessionIds = await getRedis().zrange('chat:sessions', offset, offset + limit - 1, { rev: true });
   
   const sessions: ChatSession[] = [];
   for (const id of sessionIds) {
@@ -168,11 +178,11 @@ export async function listSessions(
 }
 
 export async function getAnalytics(): Promise<ChatAnalytics> {
-  const totalSessions = (await redis.get('chat:stats:totalSessions') as number) || 0;
-  const totalMessages = (await redis.get('chat:stats:totalMessages') as number) || 0;
-  const flaggedCount = (await redis.get('chat:stats:flaggedCount') as number) || 0;
+  const totalSessions = (await getRedis().get('chat:stats:totalSessions') as number) || 0;
+  const totalMessages = (await getRedis().get('chat:stats:totalMessages') as number) || 0;
+  const flaggedCount = (await getRedis().get('chat:stats:flaggedCount') as number) || 0;
   
-  const topQuestionsRaw = await redis.zrange('chat:questions', 0, 9, { rev: true, withScores: true });
+  const topQuestionsRaw = await getRedis().zrange('chat:questions', 0, 9, { rev: true, withScores: true });
   
   const topQuestions: { question: string; count: number }[] = [];
   for (let i = 0; i < topQuestionsRaw.length; i += 2) {
@@ -192,8 +202,8 @@ export async function getAnalytics(): Promise<ChatAnalytics> {
 }
 
 export async function deleteSession(sessionId: string): Promise<void> {
-  await redis.del(`chat:${sessionId}`);
-  await redis.zrem('chat:sessions', sessionId);
+  await getRedis().del(`chat:${sessionId}`);
+  await getRedis().zrem('chat:sessions', sessionId);
 }
 
-export default redis;
+export { getRedis as redis };

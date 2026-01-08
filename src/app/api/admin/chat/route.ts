@@ -12,6 +12,9 @@ import {
   flagSession 
 } from '@/lib/chat-store';
 
+// Force dynamic rendering
+export const dynamic = 'force-dynamic';
+
 // GET /api/admin/chat - List sessions or get analytics
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
