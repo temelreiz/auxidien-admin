@@ -46,6 +46,17 @@ export interface ChatAnalytics {
   avgMessagesPerSession: number;
 }
 
+// Helper: Remove null/undefined values from object
+function cleanObject(obj: Record<string, any>): Record<string, any> {
+  const cleaned: Record<string, any> = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (value !== null && value !== undefined) {
+      cleaned[key] = value;
+    }
+  }
+  return cleaned;
+}
+
 // ═══════════════════════════════════════════════════════════════
 // CHAT OPERATIONS
 // ═══════════════════════════════════════════════════════════════
@@ -56,15 +67,23 @@ export async function createSession(sessionId: string, userAgent?: string, ip?: 
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     messages: [],
-    userAgent,
-    ip,
     status: 'active',
   };
   
-  await getRedis().hset(`chat:${sessionId}`, {
-    ...session,
+  // Only add optional fields if they have values
+  if (userAgent) session.userAgent = userAgent;
+  if (ip) session.ip = ip;
+  
+  const dataToStore = cleanObject({
+    id: session.id,
+    createdAt: session.createdAt,
+    updatedAt: session.updatedAt,
     messages: JSON.stringify([]),
+    userAgent: userAgent || '',
+    status: 'active',
   });
+  
+  await getRedis().hset(`chat:${sessionId}`, dataToStore);
   await getRedis().zadd('chat:sessions', { score: Date.now(), member: sessionId });
   await getRedis().incr('chat:stats:totalSessions');
   
@@ -90,10 +109,10 @@ export async function addMessage(sessionId: string, message: ChatMessage): Promi
   const messages = session?.messages || [];
   messages.push(message);
   
-  await getRedis().hset(`chat:${sessionId}`, {
+  await getRedis().hset(`chat:${sessionId}`, cleanObject({
     messages: JSON.stringify(messages),
     updatedAt: new Date().toISOString(),
-  });
+  }));
   
   // Update session score for sorting
   await getRedis().zadd('chat:sessions', { score: Date.now(), member: sessionId });
@@ -127,10 +146,10 @@ export async function overrideResponse(
     return msg;
   });
   
-  await getRedis().hset(`chat:${sessionId}`, {
+  await getRedis().hset(`chat:${sessionId}`, cleanObject({
     messages: JSON.stringify(messages),
     updatedAt: new Date().toISOString(),
-  });
+  }));
 }
 
 export async function updateSessionStatus(
@@ -142,10 +161,10 @@ export async function updateSessionStatus(
     status,
     updatedAt: new Date().toISOString(),
   };
-  if (notes !== undefined) {
+  if (notes) {
     updates.notes = notes;
   }
-  await getRedis().hset(`chat:${sessionId}`, updates);
+  await getRedis().hset(`chat:${sessionId}`, cleanObject(updates));
 }
 
 export async function flagSession(sessionId: string, reason: string): Promise<void> {
