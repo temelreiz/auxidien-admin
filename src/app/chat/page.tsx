@@ -68,7 +68,7 @@ export default function ChatAdminDashboard() {
 
   const handleLogout = async () => {
     await fetch('/api/admin/auth', { method: 'DELETE' });
-    router.push('/admin');
+    router.push('/');
   };
 
   useEffect(() => {
@@ -186,7 +186,7 @@ export default function ChatAdminDashboard() {
       <header className="glass sticky top-0 z-50 px-6 py-4 border-b border-white/10">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <a href="/" className="flex items-center gap-2 text-gray-400 hover:text-white">
+            <a href="/dashboard" className="flex items-center gap-2 text-gray-400 hover:text-white">
               <ArrowLeft className="w-5 h-5" />
             </a>
             <div className="flex items-center gap-3">
