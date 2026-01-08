@@ -5,24 +5,26 @@ import type { NextRequest } from 'next/server';
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Login sayfası ve API açık
-  if (pathname === '/login' || pathname.startsWith('/api/')) {
+  // Ana sayfa (login), API ve static dosyalar açık
+  if (
+    pathname === '/' || 
+    pathname.startsWith('/api/') ||
+    pathname.startsWith('/_next/') ||
+    pathname.includes('.')
+  ) {
     return NextResponse.next();
   }
 
-  // Cookie kontrolü
+  // Diğer tüm sayfalar korumalı (/dashboard, /chat vs.)
   const authCookie = request.cookies.get('auxidien_admin_auth');
   
   if (authCookie?.value !== 'authenticated_admin_session') {
-    // Giriş yapmamış → login'e yönlendir
-    return NextResponse.redirect(new URL('/login', request.url));
+    return NextResponse.redirect(new URL('/', request.url));
   }
 
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|logo.png|.*\\.png|.*\\.ico|.*\\.svg).*)',
-  ],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
 };
