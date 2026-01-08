@@ -29,7 +29,7 @@ export default function AdminLogin() {
       const data = await res.json();
 
       if (res.ok && data.success) {
-        router.push('/admin/chat');
+        router.push('/');
       } else {
         setError(data.error || 'Invalid password');
       }
@@ -89,13 +89,6 @@ export default function AdminLogin() {
             {loading ? 'Verifying...' : 'Access Admin Panel'}
           </button>
         </form>
-
-        {/* Back Link */}
-        <div className="text-center mt-6">
-          <a href="/" className="text-gray-500 hover:text-gray-300 text-sm">
-            ← Back to Dashboard
-          </a>
-        </div>
       </div>
     </div>
   );
