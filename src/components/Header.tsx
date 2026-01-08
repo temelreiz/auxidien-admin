@@ -17,11 +17,11 @@ export function Header() {
         <div className="flex items-center gap-4">
           {/* Chat Admin Link */}
           <Link 
-            href="/chat"
+            href="/admin"
             className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-auxi-gold/10 border border-auxi-gold/30 hover:bg-auxi-gold/20 transition-colors"
           >
             <MessageCircle className="w-4 h-4 text-auxi-gold" />
-            <span className="text-sm text-auxi-gold">Chat</span>
+            <span className="text-sm text-auxi-gold">Admin</span>
           </Link>
 
           {/* Live Indicator */}
